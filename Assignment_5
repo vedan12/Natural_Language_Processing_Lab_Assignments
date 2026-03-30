@@ -1,0 +1,234 @@
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
+from nltk.parse import CoreNLPParser
+import re
+
+# downloading required data
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+    
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger')
+except:
+    nltk.download('averaged_perceptron_tagger')
+
+def analyze_syntactic_ambiguity(sentence):
+    """analyze syntactic ambiguity in a sentence"""
+    words = word_tokenize(sentence)
+    pos_tags = pos_tag(words)
+    
+    print(f"\nAnalyzing: '{sentence}'")
+    print("-"*50)
+    print("POS Tagging:")
+    for word, tag in pos_tags:
+        print(f"  {word}: {tag}")
+    
+    return pos_tags
+
+def demonstrate_duck_ambiguity():
+    """analyze the classic 'duck' ambiguity example"""
+    print("\n" + "="*70)
+    print("CASE STUDY: SYNTACTIC AMBIGUITY")
+    print("="*70)
+    
+    ambiguous_sentence = "I saw her duck"
+    
+    print(f"\nClassic Ambiguous Sentence: '{ambiguous_sentence}'")
+    print("\nPossible interpretations:")
+    print("1. I saw her duck (the bird) → duck as NOUN")
+    print("2. I saw her duck (to lower her head) → duck as VERB")
+    
+    # analyze with POS tagging
+    analyze_syntactic_ambiguity(ambiguous_sentence)
+    
+    return ambiguous_sentence
+
+def suggest_nlp_techniques():
+    """suggest NLP techniques for resolving ambiguity"""
+    print("\n" + "="*70)
+    print("NLP TECHNIQUES TO RESOLVE AMBIGUITY")
+    print("="*70)
+    
+    techniques = {
+        "1. Part-of-Speech Tagging": """
+   - Tags each word with grammatical category
+   - Helps identify if 'duck' is noun (NN) or verb (VB)
+   - Context from surrounding words improves accuracy""",
+        
+        "2. Dependency Parsing": """
+   - Analyzes grammatical relationships between words
+   - Determines which words modify each other
+   - Example: 'her' can be possessive pronoun or object""",
+        
+        "3. Word Sense Disambiguation": """
+   - Uses WordNet or contextual embeddings
+   - Selects correct meaning based on context
+   - Example: 'duck' → animal vs action""",
+        
+        "4. Contextual Word Embeddings": """
+   - Models like BERT understand word meaning from surrounding text
+   - 'I saw her duck' vs 'I saw her duck under the table'
+   - Context determines the correct interpretation""",
+        
+        "5. Semantic Role Labeling": """
+   - Identifies who did what to whom
+   - Helps distinguish subject-object relationships"""
+    }
+    
+    for name, description in techniques.items():
+        print(f"\n{name}:")
+        print(description)
+    
+    return techniques
+
+def evaluate_challenges():
+    """evaluate challenges in building context-aware chatbots"""
+    print("\n" + "="*70)
+    print("CHALLENGES IN BUILDING CONTEXT-AWARE CHATBOTS")
+    print("="*70)
+    
+    challenges = {
+        "1. Syntactic Ambiguity": """
+   Problem: Same sentence structure can have multiple meanings
+   Example: 'I saw her duck'
+   Impact: Chatbot may misinterpret user intent
+   Solution: POS tagging + dependency parsing""",
+        
+        "2. Lexical Ambiguity": """
+   Problem: Words with multiple meanings
+   Example: 'book' (noun) vs 'book' (verb)
+   Impact: Wrong intent detection
+   Solution: Word Sense Disambiguation (WSD)""",
+        
+        "3. Context Tracking": """
+   Problem: Maintaining conversation history across turns
+   Example: User: 'Weather in Pune?' Bot: '30°C'
+          User: 'What about tomorrow?'
+   Impact: Without context, bot doesn't know topic
+   Solution: Dialogue state tracking + memory mechanisms""",
+        
+        "4. Anaphora Resolution": """
+   Problem: Understanding pronouns like 'he', 'she', 'it', 'they'
+   Example: 'John bought a car. It is red.'
+   Impact: Bot doesn't know what 'it' refers to
+   Solution: Coreference resolution models""",
+        
+        "5. Data Scarcity": """
+   Problem: Need large labeled datasets for training
+   Impact: Poor performance for rare intents
+   Solution: Transfer learning, data augmentation""",
+        
+        "6. Real-time Processing": """
+   Problem: Need fast responses while maintaining accuracy
+   Impact: Trade-off between speed and quality
+   Solution: Optimized models, caching strategies"""
+    }
+    
+    for challenge, details in challenges.items():
+        print(f"\n{challenge}:")
+        print(details)
+    
+    return challenges
+
+def nlp_models_for_intent_detection():
+    """suggest NLP models for intent detection"""
+    print("\n" + "="*70)
+    print("NLP MODELS FOR INTENT DETECTION")
+    print("="*70)
+    
+    models = {
+        "Traditional ML Models": """
+   - Naive Bayes: Simple, fast, works with small data
+   - SVM: Good for high-dimensional text features
+   - Logistic Regression: Interpretable, good baseline
+   - Features: TF-IDF, Bag of Words, n-grams""",
+        
+        "Deep Learning Models": """
+   - RNN/LSTM: Captures sequence information
+   - CNN: Good for local patterns in text
+   - BiLSTM: Bidirectional context understanding
+   - Attention Mechanism: Focuses on important words""",
+        
+        "Transformer Models": """
+   - BERT: Bidirectional context, state-of-the-art
+   - RoBERTa: Improved BERT variant
+   - DistilBERT: Lightweight, faster inference
+   - GPT: Generative approach for conversations
+   - ALBERT: Parameter-efficient for deployment"""
+    }
+    
+    for name, description in models.items():
+        print(f"\n{name}:")
+        print(description)
+    
+    return models
+
+def simple_intent_detection_demo():
+    """simple demonstration of intent detection with ambiguity handling"""
+    print("\n" + "="*70)
+    print("INTENT DETECTION DEMONSTRATION")
+    print("="*70)
+    
+    # sample training data with ambiguous examples
+    training_data = [
+        ("book a flight", "booking"),
+        ("read a book", "reading"),
+        ("I want to book tickets", "booking"),
+        ("this book is interesting", "reading"),
+        ("duck under the table", "action"),
+        ("feed the duck", "animal"),
+        ("I saw her duck", "ambiguous"),
+        ("weather today", "weather"),
+        ("what's the temperature", "weather")
+    ]
+    
+    print("\nExample: Handling ambiguous 'duck'")
+    print("-"*40)
+    
+    ambiguous_queries = [
+        "I saw her duck",
+        "The duck is swimming",
+        "She ducked under the table"
+    ]
+    
+    for query in ambiguous_queries:
+        print(f"\nQuery: '{query}'")
+        words = word_tokenize(query)
+        tags = pos_tag(words)
+        
+        # simple rule-based disambiguation
+        for word, tag in tags:
+            if word == 'duck' and tag == 'NN':
+                print(f"  → 'duck' is NOUN (animal/bird)")
+            elif word == 'duck' and tag in ['VB', 'VBD', 'VBG']:
+                print(f"  → 'duck' is VERB (lower head/avoid)")
+        
+        print(f"  POS Tags: {tags}")
+    
+    return training_data
+
+# main execution
+if __name__ == "__main__":
+    
+    # 1. Analyze the duck ambiguity example
+    duck_example = demonstrate_duck_ambiguity()
+    
+    # 2. Evaluate challenges
+    challenges = evaluate_challenges()
+    
+    # 3. Suggest NLP techniques to resolve ambiguity
+    techniques = suggest_nlp_techniques()
+    
+    # 4. Suggest NLP models for intent detection
+    models = nlp_models_for_intent_detection()
+    
+    # 5. Simple intent detection demo
+    demo_data = simple_intent_detection_demo()
