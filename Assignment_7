@@ -166,14 +166,6 @@ def predict_sequence(model, sentence, word_to_idx, idx_to_tag, max_len):
 # main execution
 if __name__ == "__main__":
     
-    print("="*70)
-    print("NLP ASSIGNMENT 7")
-    print("LSTM Networks for Sequence Labeling (POS Tagging)")
-    print("="*70)
-    print("Name: Vedant Abhayrao Velukar")
-    print("Branch: IT | Division: B | PRN: 123B1F102")
-    print("="*70)
-    
     # step 1: preprocess data
     print("\n" + "="*70)
     print("STEP 1: PREPROCESSING DATA")
