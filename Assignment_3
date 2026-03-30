@@ -1,0 +1,234 @@
+import nltk
+from nltk.tokenize import word_tokenize
+from collections import defaultdict, Counter
+import re
+import random
+
+# downloading punkt
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+
+def clean_and_tokenize(txt):
+    """basic cleaning and tokenization"""
+    txt = txt.lower()
+    # keeping only alphabets and spaces
+    txt = re.sub(r'[^a-zA-Z\s]', '', txt)
+    words = word_tokenize(txt)
+    return words
+
+class NGramModel:
+    """simple n-gram model for next word prediction"""
+    
+    def __init__(self, n=2):
+        self.n = n  # n-gram order (2=bigram, 3=trigram)
+        self.ngrams = defaultdict(Counter)  # stores counts of n-grams
+        self.vocab = set()  # vocabulary
+        
+    def train(self, words):
+        """train the model on list of words"""
+        print(f"\nTraining {self.n}-gram model...")
+        
+        for i in range(len(words) - self.n + 1):
+            # get context (first n-1 words) and next word (last word)
+            context = tuple(words[i:i+self.n-1])
+            next_word = words[i+self.n-1]
+            
+            # store counts
+            self.ngrams[context][next_word] += 1
+            self.vocab.add(next_word)
+        
+        print(f"Found {len(self.ngrams)} unique contexts")
+        print(f"Vocabulary size: {len(self.vocab)}")
+    
+    def get_probabilities(self, context):
+        """get probability distribution for given context"""
+        context = tuple(context)
+        
+        if context not in self.ngrams:
+            return None
+        
+        total = sum(self.ngrams[context].values())
+        probs = {}
+        for word, count in self.ngrams[context].items():
+            probs[word] = count / total
+        
+        return probs
+    
+    def predict_next(self, context_words):
+        """predict most probable next word"""
+        # take last n-1 words as context
+        if len(context_words) < self.n - 1:
+            return None, "Not enough words for context"
+        
+        context = tuple(context_words[-(self.n-1):])
+        
+        if context not in self.ngrams:
+            return None, "Context not found in training data"
+        
+        # find word with highest probability
+        probs = self.get_probabilities(context)
+        if probs:
+            best_word = max(probs, key=probs.get)
+            return best_word, probs[best_word]
+        
+        return None, "No prediction available"
+    
+    def show_top_predictions(self, context_words, top_k=5):
+        """show top k predictions for given context"""
+        if len(context_words) < self.n - 1:
+            print(f"Need at least {self.n-1} words, got {len(context_words)}")
+            return
+        
+        context = tuple(context_words[-(self.n-1):])
+        
+        if context not in self.ngrams:
+            print(f"Context '{' '.join(context)}' not found in training")
+            return
+        
+        probs = self.get_probabilities(context)
+        if probs:
+            sorted_words = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:top_k]
+            print(f"\nTop {top_k} predictions for context '{' '.join(context)}':")
+            print("-"*50)
+            for word, prob in sorted_words:
+                print(f"  {word:<15} : {prob:.2%}")
+            return sorted_words
+
+# main execution
+if __name__ == "__main__":
+    
+    # training corpus - using sentences that show patterns
+    training_text = """
+    Natural language processing is a fascinating field. 
+    Machine learning is a subset of artificial intelligence. 
+    Deep learning is a subset of machine learning. 
+    Natural language processing uses machine learning techniques. 
+    Students learn natural language processing in college. 
+    I love programming in Python. 
+    Python is great for machine learning. 
+    Machine learning models need training data. 
+    The quick brown fox jumps over the lazy dog. 
+    I love learning new things. 
+    Learning is fun and exciting.
+    """
+    
+    print("\n" + "="*70)
+    print("TRAINING CORPUS:")
+    print("="*70)
+    print(training_text)
+    
+    # preprocessing
+    print("\n" + "="*70)
+    print("STEP 1: PREPROCESSING")
+    print("="*70)
+    words = clean_and_tokenize(training_text)
+    print(f"Total words after cleaning: {len(words)}")
+    print(f"Sample words: {words[:20]}...")
+    
+    # generate unigrams (just for analysis)
+    print("\n" + "="*70)
+    print("STEP 2: UNIGRAM ANALYSIS")
+    print("="*70)
+    unigram_counts = Counter(words)
+    print("Most common unigrams (top 10):")
+    for word, count in unigram_counts.most_common(10):
+        print(f"  {word:<15} : {count} times")
+    
+    # bigram model
+    print("\n" + "="*70)
+    print("STEP 3: BIGRAM MODEL")
+    print("="*70)
+    bigram_model = NGramModel(n=2)
+    bigram_model.train(words)
+    
+    # show some bigram examples
+    print("\nSample bigram probabilities:")
+    sample_contexts = [['learning'], ['machine'], ['language'], ['python']]
+    for ctx in sample_contexts:
+        probs = bigram_model.get_probabilities(ctx)
+        if probs:
+            print(f"\nContext: '{ctx[0]}'")
+            for word, prob in list(probs.items())[:3]:
+                print(f"  {word} -> {prob:.2%}")
+    
+    # trigram model
+    print("\n" + "="*70)
+    print("STEP 4: TRIGRAM MODEL")
+    print("="*70)
+    trigram_model = NGramModel(n=3)
+    trigram_model.train(words)
+    
+    print("\nSample trigram probabilities:")
+    sample_trigrams = [['natural', 'language'], ['machine', 'learning'], ['deep', 'learning']]
+    for ctx in sample_trigrams:
+        probs = trigram_model.get_probabilities(ctx)
+        if probs:
+            print(f"\nContext: '{ctx[0]} {ctx[1]}'")
+            for word, prob in list(probs.items())[:3]:
+                print(f"  {word} -> {prob:.2%}")
+    
+    # prediction demo
+    print("\n" + "="*70)
+    print("STEP 5: NEXT WORD PREDICTION")
+    print("="*70)
+    
+    test_inputs = [
+        (["natural", "language"], 3),
+        (["machine", "learning"], 3),
+        (["i", "love"], 2),
+        (["the", "quick"], 3),
+        (["deep", "learning"], 3),
+        (["learning", "is"], 2)
+    ]
+    
+    for test_input, model_type in test_inputs:
+        print(f"\nInput: {' '.join(test_input)}")
+        
+        if model_type == 3:
+            # try trigram first
+            pred, prob = trigram_model.predict_next(test_input)
+            if pred:
+                print(f"Trigram prediction: '{pred}' (confidence: {prob:.2%})")
+                trigram_model.show_top_predictions(test_input, top_k=3)
+            else:
+                # fallback to bigram
+                print("Trigram not found, trying bigram...")
+                pred, prob = bigram_model.predict_next([test_input[-1]])
+                if pred:
+                    print(f"Bigram prediction: '{pred}' (confidence: {prob:.2%})")
+        else:
+            # use bigram
+            pred, prob = bigram_model.predict_next([test_input[-1]])
+            if pred:
+                print(f"Bigram prediction: '{pred}' (confidence: {prob:.2%})")
+                bigram_model.show_top_predictions([test_input[-1]], top_k=3)
+    
+    # evaluation - simple test
+    print("\n" + "="*70)
+    print("EVALUATION")
+    print("="*70)
+    
+    test_sentences = [
+        "natural language processing",
+        "machine learning models",
+        "python is great"
+    ]
+    
+    for sentence in test_sentences:
+        words_list = sentence.split()
+        print(f"\nTest: '{sentence}'")
+        
+        if len(words_list) >= 2:
+            context = [words_list[-2], words_list[-1]]
+            pred, prob = trigram_model.predict_next(context)
+            if pred:
+                print(f"  Next word prediction: '{pred}' (prob: {prob:.2%})")
+            else:
+                print("  No prediction available")
