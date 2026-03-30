@@ -1,0 +1,309 @@
+import numpy as np
+from collections import defaultdict, Counter
+import re
+import nltk
+from nltk.tokenize import word_tokenize
+import math
+
+# downloading punkt
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+
+def clean_and_tokenize(txt):
+    """simple cleaning and tokenization"""
+    txt = txt.lower()
+    txt = re.sub(r'[^a-zA-Z\s]', '', txt)
+    words = word_tokenize(txt)
+    return words
+
+def create_one_hot(word_idx, vocab_size):
+    """create one-hot encoded vector for a word"""
+    one_hot = np.zeros(vocab_size)
+    one_hot[word_idx] = 1
+    return one_hot
+
+class SimpleWord2Vec:
+    """simple implementation of Skip-gram word2vec"""
+    
+    def __init__(self, vocab_size, embedding_dim=50):
+        self.vocab_size = vocab_size
+        self.embedding_dim = embedding_dim
+        
+        # initialize weights randomly
+        self.w1 = np.random.randn(vocab_size, embedding_dim) / np.sqrt(embedding_dim)
+        self.w2 = np.random.randn(embedding_dim, vocab_size) / np.sqrt(embedding_dim)
+        
+    def forward(self, input_word):
+        """forward pass to get predictions"""
+        h = np.dot(input_word, self.w1)  # hidden layer
+        u = np.dot(h, self.w2)  # output layer
+        # softmax activation
+        exp_u = np.exp(u - np.max(u))
+        y_pred = exp_u / np.sum(exp_u)
+        return y_pred, h
+    
+    def backward(self, input_word, target, y_pred, h, learning_rate=0.01):
+        """backward pass to update weights"""
+        # calculate error
+        error = y_pred - target
+        
+        # update w2
+        grad_w2 = np.outer(h, error)
+        self.w2 -= learning_rate * grad_w2
+        
+        # update w1
+        grad_w1 = np.outer(input_word, np.dot(error, self.w2.T))
+        self.w1 -= learning_rate * grad_w1
+        
+    def train(self, training_pairs, epochs=100, learning_rate=0.01, verbose=True):
+        """train the model on skip-gram pairs"""
+        losses = []
+        
+        for epoch in range(epochs):
+            total_loss = 0
+            
+            for target_word, context_word in training_pairs:
+                # forward pass
+                y_pred, h = self.forward(target_word)
+                total_loss += -np.log(y_pred[np.argmax(context_word)] + 1e-8)
+                
+                # backward pass
+                self.backward(target_word, context_word, y_pred, h, learning_rate)
+            
+            avg_loss = total_loss / len(training_pairs)
+            losses.append(avg_loss)
+            
+            if verbose and (epoch + 1) % 20 == 0:
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
+        
+        return losses
+    
+    def get_embedding(self, word_idx):
+        """get embedding vector for a word"""
+        return self.w1[word_idx]
+    
+    def cosine_similarity(self, vec1, vec2):
+        """compute cosine similarity between two vectors"""
+        if np.linalg.norm(vec1) == 0 or np.linalg.norm(vec2) == 0:
+            return 0
+        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+    
+    def find_similar_words(self, word_idx, word_list, idx_to_word, top_k=5):
+        """find most similar words using cosine similarity"""
+        word_vec = self.get_embedding(word_idx)
+        similarities = []
+        
+        for idx in range(self.vocab_size):
+            if idx != word_idx:
+                sim = self.cosine_similarity(word_vec, self.get_embedding(idx))
+                similarities.append((idx, sim))
+        
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        similar_words = []
+        for idx, sim in similarities[:top_k]:
+            similar_words.append((idx_to_word[idx], sim))
+        
+        return similar_words
+
+def create_skipgram_pairs(words, window_size=2, word_to_idx=None):
+    """create training pairs for skip-gram model"""
+    pairs = []
+    
+    for i, target_word in enumerate(words):
+        # define context window
+        start = max(0, i - window_size)
+        end = min(len(words), i + window_size + 1)
+        
+        context_words = [words[j] for j in range(start, end) if j != i]
+        
+        for context in context_words:
+            pairs.append((target_word, context))
+    
+    return pairs
+
+# main execution
+if __name__ == "__main__":
+    
+    # training corpus
+    training_text = """
+    Natural language processing is a fascinating field of artificial intelligence. 
+    Machine learning is a subset of artificial intelligence. 
+    Deep learning is a subset of machine learning. 
+    Natural language processing uses machine learning techniques. 
+    Python is a popular programming language for machine learning. 
+    Data science uses machine learning and deep learning. 
+    Artificial intelligence and machine learning are related fields. 
+    Students learn natural language processing in college. 
+    Programming in Python is fun and exciting.
+    """
+    
+    print("\n" + "="*70)
+    print("TRAINING CORPUS:")
+    print("="*70)
+    print(training_text)
+    
+    # step 1: preprocessing
+    print("\n" + "="*70)
+    print("STEP 1: TEXT PREPROCESSING")
+    print("="*70)
+    words = clean_and_tokenize(training_text)
+    print(f"Total words after cleaning: {len(words)}")
+    print(f"Sample words: {words[:30]}...")
+    
+    # step 2: build vocabulary
+    print("\n" + "="*70)
+    print("STEP 2: BUILDING VOCABULARY")
+    print("="*70)
+    
+    # count word frequencies
+    word_counts = Counter(words)
+    print(f"Unique words: {len(word_counts)}")
+    
+    # create mappings
+    word_to_idx = {}
+    idx_to_word = {}
+    for i, (word, count) in enumerate(word_counts.items()):
+        word_to_idx[word] = i
+        idx_to_word[i] = word
+    
+    vocab_size = len(word_counts)
+    print(f"Vocabulary size: {vocab_size}")
+    
+    print("\nMost common words in vocabulary:")
+    for word, count in word_counts.most_common(10):
+        print(f"  {word:<20} : {count} times")
+    
+    # step 3: create training data (skip-gram pairs)
+    print("\n" + "="*70)
+    print("STEP 3: GENERATING SKIP-GRAM TRAINING DATA")
+    print("="*70)
+    
+    window_size = 2
+    skipgram_pairs = create_skipgram_pairs(words, window_size)
+    print(f"Total training pairs: {len(skipgram_pairs)}")
+    print("Sample skip-gram pairs:")
+    for i, (target, context) in enumerate(skipgram_pairs[:10]):
+        print(f"  ({target}, {context})")
+    
+    # convert pairs to one-hot encoded vectors
+    training_data = []
+    for target, context in skipgram_pairs:
+        target_vec = create_one_hot(word_to_idx[target], vocab_size)
+        context_vec = create_one_hot(word_to_idx[context], vocab_size)
+        training_data.append((target_vec, context_vec))
+    
+    # step 4: train word2vec model
+    print("\n" + "="*70)
+    print("STEP 4: TRAINING WORD2VEC MODEL")
+    print("="*70)
+    
+    embedding_dim = 20  # smaller dimension for faster training
+    model = SimpleWord2Vec(vocab_size, embedding_dim)
+    print(f"Embedding dimension: {embedding_dim}")
+    print("Training in progress...")
+    
+    losses = model.train(training_data, epochs=100, learning_rate=0.05)
+    print("\nTraining completed!")
+    
+    # step 5: visualize training loss
+    print("\n" + "="*70)
+    print("STEP 5: TRAINING PERFORMANCE")
+    print("="*70)
+    print(f"Initial loss: {losses[0]:.4f}")
+    print(f"Final loss: {losses[-1]:.4f}")
+    print(f"Loss reduction: {((losses[0] - losses[-1])/losses[0]*100):.2f}%")
+    
+    # step 6: measure semantic similarity
+    print("\n" + "="*70)
+    print("STEP 6: SEMANTIC SIMILARITY ANALYSIS")
+    print("="*70)
+    
+    # list of words to analyze
+    test_words = ['machine', 'learning', 'python', 'language', 'intelligence', 'deep', 'data']
+    
+    print("\nWord embeddings (first 5 dimensions):")
+    for word in test_words:
+        if word in word_to_idx:
+            idx = word_to_idx[word]
+            embedding = model.get_embedding(idx)
+            print(f"{word:<15} : {embedding[:5].round(4)}...")
+    
+    # compute cosine similarity between words
+    print("\nCosine Similarity between words:")
+    print("-"*60)
+    
+    word_pairs = [
+        ('machine', 'learning'),
+        ('python', 'programming'),
+        ('artificial', 'intelligence'),
+        ('deep', 'learning'),
+        ('natural', 'language'),
+        ('machine', 'intelligence'),
+        ('python', 'java'),
+        ('data', 'science')
+    ]
+    
+    for w1, w2 in word_pairs:
+        if w1 in word_to_idx and w2 in word_to_idx:
+            vec1 = model.get_embedding(word_to_idx[w1])
+            vec2 = model.get_embedding(word_to_idx[w2])
+            sim = model.cosine_similarity(vec1, vec2)
+            print(f"  {w1:<12} and {w2:<12} : {sim:.4f}")
+        else:
+            print(f"  {w1:<12} and {w2:<12} : word not in vocabulary")
+    
+    # find similar words
+    print("\n" + "="*70)
+    print("STEP 7: FINDING SIMILAR WORDS")
+    print("="*70)
+    
+    words_to_analyze = ['machine', 'learning', 'python', 'language']
+    
+    for word in words_to_analyze:
+        if word in word_to_idx:
+            idx = word_to_idx[word]
+            similar = model.find_similar_words(idx, word_counts, idx_to_word, top_k=5)
+            print(f"\nWords similar to '{word}':")
+            for similar_word, sim in similar:
+                print(f"  {similar_word:<15} : {sim:.4f}")
+    
+    # step 8: comparing with traditional methods
+    print("\n" + "="*70)
+    print("STEP 8: COMPARISON WITH TRADITIONAL METHODS")
+    print("="*70)
+    
+    # One-hot encoding demonstration
+    print("\n1. ONE-HOT ENCODING:")
+    print("-"*50)
+    test_word = "machine"
+    if test_word in word_to_idx:
+        one_hot = create_one_hot(word_to_idx[test_word], vocab_size)
+        print(f"One-hot encoding for '{test_word}':")
+        print(f"  Vector of size {vocab_size}, only 1 at position {word_to_idx[test_word]}")
+        print(f"  First 10 elements: {one_hot[:10]}")
+    
+    # TF-IDF demonstration (simplified)
+    print("\n2. TF-IDF CONCEPT:")
+    print("-"*50)
+    print("TF-IDF gives importance to words based on frequency across documents")
+    print("  - High TF-IDF: Words that appear often in a document but rarely in others")
+    print("  - Example: 'processing' might have high TF-IDF if it appears only in NLP docs")
+    
+    # Word2Vec vs One-hot comparison
+    print("\n3. WORD2VEC vs ONE-HOT:")
+    print("-"*50)
+    print("One-hot encoding:")
+    print("  - Sparse vectors (mostly zeros)")
+    print("  - No semantic information")
+    print("  - All words are equally different")
+    print("\nWord2Vec embeddings:")
+    print("  - Dense vectors with continuous values")
+    print("  - Captures semantic meaning")
+    print("  - Similar words have similar vectors")
