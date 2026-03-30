@@ -1,0 +1,216 @@
+import nltk
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.tag import pos_tag
+import re
+
+# downloading required nltk data
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+    
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger')
+except:
+    nltk.download('averaged_perceptron_tagger')
+    
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+except:
+    nltk.download('averaged_perceptron_tagger_eng')
+
+def clean_text(txt):
+    """basic text cleaning"""
+    txt = txt.lower()
+    txt = re.sub(r'[^a-zA-Z\s\.\,\?\!]', '', txt)
+    return txt
+
+def explain_tag(tag):
+    """function to explain what each POS tag means"""
+    tag_dict = {
+        'NN': 'Noun (singular)',
+        'NNS': 'Noun (plural)',
+        'NNP': 'Proper noun (singular)',
+        'NNPS': 'Proper noun (plural)',
+        'VB': 'Verb (base form)',
+        'VBD': 'Verb (past tense)',
+        'VBG': 'Verb (gerund/present participle)',
+        'VBN': 'Verb (past participle)',
+        'VBP': 'Verb (non-3rd person singular present)',
+        'VBZ': 'Verb (3rd person singular present)',
+        'JJ': 'Adjective',
+        'JJR': 'Adjective (comparative)',
+        'JJS': 'Adjective (superlative)',
+        'RB': 'Adverb',
+        'RBR': 'Adverb (comparative)',
+        'RBS': 'Adverb (superlative)',
+        'PRP': 'Personal pronoun',
+        'PRP$': 'Possessive pronoun',
+        'DT': 'Determiner',
+        'IN': 'Preposition',
+        'CC': 'Conjunction',
+        'MD': 'Modal verb',
+        'TO': 'to',
+        'EX': 'Existential there',
+        'FW': 'Foreign word',
+        'LS': 'List item marker',
+        'RP': 'Particle',
+        'SYM': 'Symbol',
+        'UH': 'Interjection',
+        'WP': 'Wh-pronoun',
+        'WP$': 'Possessive wh-pronoun',
+        'WRB': 'Wh-adverb',
+        '.': 'Punctuation mark',
+        ',': 'Comma',
+        ':': 'Colon'
+    }
+    return tag_dict.get(tag, 'Unknown')
+
+if __name__ == "__main__":
+    
+    # sample text dataset - using sentences that show different POS patterns
+    text_data = """
+    The quick brown fox jumps over the lazy dog. 
+    She is reading a fascinating book about Valmiki Ramayan. 
+    They will book the tickets for tomorrow's show. 
+    Running is good for health. 
+    I love programming in Python.
+    """
+    
+    print("\n" + "="*70)
+    print("ORIGINAL TEXT:")
+    print("="*70)
+    print(text_data)
+    
+    # step 1: cleaning
+    print("\n" + "="*70)
+    print("STEP 1: TEXT CLEANING")
+    print("="*70)
+    cleaned_text = clean_text(text_data)
+    print("After cleaning:")
+    print(cleaned_text)
+    
+    # step 2: sentence tokenization
+    print("\n" + "="*70)
+    print("STEP 2: SENTENCE TOKENIZATION")
+    print("="*70)
+    sentences = sent_tokenize(cleaned_text)
+    for i, sent in enumerate(sentences, 1):
+        print(f"Sentence {i}: {sent.strip()}")
+    print(f"\nTotal sentences: {len(sentences)}")
+    
+    # step 3: word tokenization and POS tagging
+    print("\n" + "="*70)
+    print("STEP 3: POS TAGGING RESULTS")
+    print("="*70)
+    
+    all_tagged_words = []
+    
+    for sent_idx, sentence in enumerate(sentences, 1):
+        print(f"\n{'='*70}")
+        print(f"SENTENCE {sent_idx}: {sentence.strip()}")
+        print(f"{'='*70}")
+        
+        # word tokenization
+        words = word_tokenize(sentence)
+        
+        # POS tagging
+        tagged_words = pos_tag(words)
+        all_tagged_words.extend(tagged_words)
+        
+        print(f"\n{'Word':<20} {'POS Tag':<15} {'Meaning':<35}")
+        print("-"*70)
+        
+        for word, tag in tagged_words:
+            meaning = explain_tag(tag)
+            print(f"{word:<20} {tag:<15} {meaning:<35}")
+    
+    # step 4: summary statistics
+    print("\n" + "="*70)
+    print("SUMMARY STATISTICS")
+    print("="*70)
+    
+    # counting different POS categories
+    pos_counts = {}
+    for word, tag in all_tagged_words:
+        # get the main category (first 2 characters for most tags)
+        if tag[0:2] in ['NN', 'VB', 'JJ', 'RB', 'PR', 'DT', 'IN', 'CC', 'MD', 'TO']:
+            main_cat = tag[0:2]
+        else:
+            main_cat = tag[0:1]
+        
+        if main_cat in pos_counts:
+            pos_counts[main_cat] += 1
+        else:
+            pos_counts[main_cat] = 1
+    
+    print("\nPOS Category Distribution:")
+    print("-"*50)
+    category_names = {
+        'NN': 'Nouns',
+        'VB': 'Verbs',
+        'JJ': 'Adjectives',
+        'RB': 'Adverbs',
+        'PR': 'Pronouns',
+        'DT': 'Determiners',
+        'IN': 'Prepositions',
+        'CC': 'Conjunctions',
+        'MD': 'Modal verbs',
+        'TO': 'to',
+        '.': 'Punctuation'
+    }
+    
+    for cat, count in sorted(pos_counts.items(), key=lambda x: x[1], reverse=True):
+        name = category_names.get(cat, cat)
+        print(f"{name:<20} : {count} words")
+    
+    print(f"\nTotal words tagged: {len(all_tagged_words)}")
+    
+    # step 5: handling lexical ambiguity - showing same word different tags
+    print("\n" + "="*70)
+    print("LEXICAL AMBIGUITY - Same word different POS")
+    print("="*70)
+    
+    word_examples = {}
+    for word, tag in all_tagged_words:
+        if word not in word_examples:
+            word_examples[word] = []
+        if tag not in word_examples[word]:
+            word_examples[word].append(tag)
+    
+    print("\nWords with multiple POS tags in the text:")
+    print("-"*50)
+    ambiguous_found = False
+    for word, tags in word_examples.items():
+        if len(tags) > 1:
+            ambiguous_found = True
+            print(f"\n'{word}' appears with tags:")
+            for tag in tags:
+                print(f"  - {tag} ({explain_tag(tag)})")
+    
+    if not ambiguous_found:
+        print("No ambiguous words found in this text sample.")
+    
+    # showing the "book" example manually
+    print("\n" + "="*70)
+    print("CLASSIC EXAMPLE: 'book' as Noun vs Verb")
+    print("="*70)
+    print("'book' as Noun - I read a book.")
+    print("'book' as Verb - I will book a ticket.")
+    print("\nIn our text above:")
+    print("- 'book' appears as: ", end="")
+    book_tags = []
+    for word, tag in all_tagged_words:
+        if word == 'book':
+            book_tags.append(tag)
+    if book_tags:
+        print(f"{', '.join(book_tags)}")
+        for tag in set(book_tags):
+            print(f"  - {tag} means: {explain_tag(tag)}")
+    else:
+        print("not found in this sample, but concept is important")
