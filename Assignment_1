@@ -20,6 +20,11 @@ try:
 except:
     nltk.download('omw-1.4')
 
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+
 # initializing the stemmers and lemmatizer
 ps = PorterStemmer()
 ss = SnowballStemmer('english')
