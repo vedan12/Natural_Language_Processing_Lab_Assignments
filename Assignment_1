@@ -1,0 +1,159 @@
+import nltk
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.stem import PorterStemmer, SnowballStemmer
+from nltk.stem import WordNetLemmatizer
+import re
+
+# trying to download nltk data, sometimes it gives error but works
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('corpora/wordnet')
+except:
+    nltk.download('wordnet')
+    
+try:
+    nltk.data.find('corpora/omw-1.4')
+except:
+    nltk.download('omw-1.4')
+
+# initializing the stemmers and lemmatizer
+ps = PorterStemmer()
+ss = SnowballStemmer('english')
+wnl = WordNetLemmatizer()
+
+def clean_text(txt):
+    """simple text cleaning function"""
+    txt = txt.lower()
+    # removing special characters, keeping only alphabets and spaces
+    txt = re.sub(r'[^a-zA-Z\s]', '', txt)
+    return txt
+
+def get_tokens(txt):
+    """function to tokenize text into sentences and words"""
+    sentences = sent_tokenize(txt)
+    words = word_tokenize(txt)
+    return sentences, words
+
+def show_stemming(word_list):
+    """applying both stemmers and printing results"""
+    porter_results = []
+    snowball_results = []
+    
+    print("\n" + "="*70)
+    print("STEMMING OUTPUT")
+    print("="*70)
+    print(f"{'Word':<20} {'Porter':<20} {'Snowball':<20}")
+    print("-"*70)
+    
+    for w in word_list:
+        p_stem = ps.stem(w)
+        s_stem = ss.stem(w)
+        porter_results.append(p_stem)
+        snowball_results.append(s_stem)
+        print(f"{w:<20} {p_stem:<20} {s_stem:<20}")
+    
+    return porter_results, snowball_results
+
+def show_lemmatization(word_list):
+    """applying lemmatization with noun and verb forms"""
+    lemmas = []
+    
+    print("\n" + "="*70)
+    print("LEMMATIZATION OUTPUT")
+    print("="*70)
+    print(f"{'Word':<20} {'Lemma (Noun)':<20} {'Lemma (Verb)':<20}")
+    print("-"*70)
+    
+    for w in word_list:
+        lem_noun = wnl.lemmatize(w, pos='n')
+        lem_verb = wnl.lemmatize(w, pos='v')
+        lemmas.append(lem_noun)
+        print(f"{w:<20} {lem_noun:<20} {lem_verb:<20}")
+    
+    return lemmas
+
+def compare_results(word_list, porter_list, lemma_list):
+    """comparing stemmer and lemmatizer outputs"""
+    print("\n" + "="*70)
+    print("COMPARISON TABLE")
+    print("="*70)
+    print(f"{'Original':<20} {'Porter Stem':<20} {'Lemma':<20} {'Different':<15}")
+    print("-"*70)
+    
+    diff_count = 0
+    for i in range(len(word_list)):
+        is_diff = porter_list[i] != lemma_list[i]
+        if is_diff:
+            diff_count += 1
+        status = "Yes" if is_diff else "No"
+        print(f"{word_list[i]:<20} {porter_list[i]:<20} {lemma_list[i]:<20} {status:<15}")
+    
+    return diff_count
+
+# main execution
+if __name__ == "__main__":
+    
+    text_data = """
+    Natural Language Processing is an exciting field of artificial intelligence. 
+    It helps computers understand, interpret, and manipulate human language. 
+    Students are learning various NLP techniques including tokenization, 
+    stemming, and lemmatization. They are studying the differences between 
+    stemming and lemmatization. The classes are running smoothly. 
+    Running is a common word that demonstrates these concepts well. 
+    Better understanding leads to better implementation.
+    """
+    
+    print("\n" + "="*70)
+    print("ORIGINAL TEXT:")
+    print("="*70)
+    print(text_data)
+    
+    # cleaning the text
+    print("\n" + "="*70)
+    print("STEP 1: TEXT CLEANING")
+    print("="*70)
+    cleaned = clean_text(text_data)
+    print("After cleaning (lowercase + removing special chars):")
+    print(cleaned)
+    
+    # tokenization step
+    print("\n" + "="*70)
+    print("STEP 2: TOKENIZATION")
+    print("="*70)
+    
+    sentences_list, words_list = get_tokens(cleaned)
+    
+    print("\nSentence wise tokenization:")
+    print("-"*50)
+    for idx, sent in enumerate(sentences_list, 1):
+        print(f"Sentence {idx}: {sent}")
+    
+    print(f"\nTotal Sentences: {len(sentences_list)}")
+    
+    print("\nWord tokenization:")
+    print("-"*50)
+    print(f"Total Words: {len(words_list)}")
+    print("Word list:")
+    print(words_list[:20])  # showing first 20 words only to avoid clutter
+    print("... (showing first 20 words)")
+    
+    # stemming
+    porter_out, snowball_out = show_stemming(words_list)
+    
+    # lemmatization
+    lemma_out = show_lemmatization(words_list)
+    
+    # comparison
+    diff_words = compare_results(words_list, porter_out, lemma_out)
+    
+    # summary
+    print("\n" + "="*70)
+    print("SUMMARY")
+    print("="*70)
+    print(f"Total words processed: {len(words_list)}")
+    print(f"Words with different results: {diff_words}")
+    print(f"Words with same results: {len(words_list) - diff_words}")
