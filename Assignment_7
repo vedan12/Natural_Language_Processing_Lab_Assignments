@@ -1,0 +1,301 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, TimeDistributed, Bidirectional
+from tensorflow.keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+import nltk
+from nltk.tokenize import word_tokenize
+import re
+
+# downloading nltk data
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+
+# sample dataset for POS tagging (sequence labeling)
+sentences = [
+    "Ram lives in Pune",
+    "She loves programming in Python",
+    "The cat sat on the mat",
+    "I am learning deep learning",
+    "Python is a great language",
+    "Machine learning is fascinating",
+    "They are playing football",
+    "He works at Google",
+    "Natural language processing is interesting",
+    "She bought a new phone"
+]
+
+# corresponding POS tags (sequence labels for each word)
+# using simplified POS tags: NNP, VBZ, IN, NNP, PRP, VBZ, VBG, IN, NNP, DT, NN, VBD, IN, DT, NN, etc.
+pos_tags = [
+    ["NNP", "VBZ", "IN", "NNP"],
+    ["PRP", "VBZ", "VBG", "IN", "NNP"],
+    ["DT", "NN", "VBD", "IN", "DT", "NN"],
+    ["PRP", "VBP", "VBG", "JJ", "NN"],
+    ["NNP", "VBZ", "DT", "JJ", "NN"],
+    ["NN", "NN", "VBZ", "JJ"],
+    ["PRP", "VBP", "VBG", "NN"],
+    ["PRP", "VBZ", "IN", "NNP"],
+    ["JJ", "NN", "NN", "VBZ", "JJ"],
+    ["PRP", "VBD", "DT", "JJ", "NN"]
+]
+
+def clean_sentence(sentence):
+    """basic cleaning"""
+    sentence = sentence.lower()
+    sentence = re.sub(r'[^a-zA-Z\s]', '', sentence)
+    return sentence
+
+def preprocess_data(sentences, tags):
+    """preprocess sentences and tags for LSTM"""
+    processed_sentences = []
+    processed_tags = []
+    
+    for i, sentence in enumerate(sentences):
+        # clean and tokenize
+        cleaned = clean_sentence(sentence)
+        words = word_tokenize(cleaned)
+        processed_sentences.append(words)
+        processed_tags.append(tags[i])
+    
+    return processed_sentences, processed_tags
+
+def prepare_vocab(sentences, tags):
+    """create word and tag vocabularies"""
+    all_words = []
+    all_tags = []
+    
+    for sentence in sentences:
+        all_words.extend(sentence)
+    
+    for tag_seq in tags:
+        all_tags.extend(tag_seq)
+    
+    # create word to index mapping
+    word_vocab = sorted(set(all_words))
+    word_to_idx = {word: i+1 for i, word in enumerate(word_vocab)}  # 0 reserved for padding
+    idx_to_word = {i+1: word for i, word in enumerate(word_vocab)}
+    
+    # create tag to index mapping
+    tag_vocab = sorted(set(all_tags))
+    tag_to_idx = {tag: i for i, tag in enumerate(tag_vocab)}
+    idx_to_tag = {i: tag for i, tag in enumerate(tag_vocab)}
+    
+    return word_to_idx, idx_to_word, tag_to_idx, idx_to_tag, len(word_vocab), len(tag_vocab)
+
+def encode_data(sentences, tags, word_to_idx, tag_to_idx):
+    """encode words and tags to indices"""
+    encoded_sentences = []
+    encoded_tags = []
+    max_len = 0
+    
+    # find max sequence length
+    for sentence in sentences:
+        max_len = max(max_len, len(sentence))
+    
+    for sentence, tag_seq in zip(sentences, tags):
+        # encode words
+        word_ids = [word_to_idx[word] for word in sentence]
+        encoded_sentences.append(word_ids)
+        
+        # encode tags
+        tag_ids = [tag_to_idx[tag] for tag in tag_seq]
+        encoded_tags.append(tag_ids)
+    
+    # pad sequences
+    X = pad_sequences(encoded_sentences, maxlen=max_len, padding='post')
+    y = pad_sequences(encoded_tags, maxlen=max_len, padding='post', value=-1)
+    
+    return X, y, max_len
+
+def build_lstm_model(vocab_size, tag_size, max_len, embedding_dim=50):
+    """build LSTM model for sequence labeling"""
+    model = Sequential([
+        Embedding(input_dim=vocab_size+1, output_dim=embedding_dim, input_length=max_len),
+        Bidirectional(LSTM(units=64, return_sequences=True)),
+        TimeDistributed(Dense(tag_size, activation='softmax'))
+    ])
+    
+    model.compile(
+        optimizer='adam',
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    
+    return model
+
+def predict_sequence(model, sentence, word_to_idx, idx_to_tag, max_len):
+    """predict tags for a new sentence"""
+    # clean and tokenize
+    cleaned = clean_sentence(sentence)
+    words = word_tokenize(cleaned)
+    
+    # encode
+    word_ids = []
+    for word in words:
+        if word in word_to_idx:
+            word_ids.append(word_to_idx[word])
+        else:
+            word_ids.append(0)  # unknown word
+    
+    # pad
+    padded = pad_sequences([word_ids], maxlen=max_len, padding='post')
+    
+    # predict
+    predictions = model.predict(padded, verbose=0)
+    predicted_indices = np.argmax(predictions, axis=2)[0]
+    
+    # convert back to tags
+    predicted_tags = []
+    for i, idx in enumerate(predicted_indices):
+        if i < len(words):
+            predicted_tags.append(idx_to_tag[idx])
+    
+    return words, predicted_tags
+
+# main execution
+if __name__ == "__main__":
+    
+    print("="*70)
+    print("NLP ASSIGNMENT 7")
+    print("LSTM Networks for Sequence Labeling (POS Tagging)")
+    print("="*70)
+    print("Name: Vedant Abhayrao Velukar")
+    print("Branch: IT | Division: B | PRN: 123B1F102")
+    print("="*70)
+    
+    # step 1: preprocess data
+    print("\n" + "="*70)
+    print("STEP 1: PREPROCESSING DATA")
+    print("="*70)
+    
+    processed_sentences, processed_tags = preprocess_data(sentences, pos_tags)
+    
+    print(f"Total sentences: {len(processed_sentences)}")
+    print("\nSample data:")
+    for i in range(3):
+        print(f"  Sentence: {processed_sentences[i]}")
+        print(f"  Tags: {processed_tags[i]}")
+        print()
+    
+    # step 2: create vocabularies
+    print("\n" + "="*70)
+    print("STEP 2: BUILDING VOCABULARIES")
+    print("="*70)
+    
+    word_to_idx, idx_to_word, tag_to_idx, idx_to_tag, vocab_size, tag_size = prepare_vocab(
+        processed_sentences, processed_tags
+    )
+    
+    print(f"Vocabulary size: {vocab_size}")
+    print(f"Tag size: {tag_size}")
+    print(f"Tags: {list(tag_to_idx.keys())}")
+    
+    # step 3: encode data
+    print("\n" + "="*70)
+    print("STEP 3: ENCODING AND PADDING")
+    print("="*70)
+    
+    X, y, max_len = encode_data(processed_sentences, processed_tags, word_to_idx, tag_to_idx)
+    
+    print(f"Input shape: {X.shape}")
+    print(f"Output shape: {y.shape}")
+    print(f"Max sequence length: {max_len}")
+    
+    # step 4: split data
+    print("\n" + "="*70)
+    print("STEP 4: TRAIN-TEST SPLIT")
+    print("="*70)
+    
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+    
+    print(f"Training samples: {X_train.shape[0]}")
+    print(f"Testing samples: {X_test.shape[0]}")
+    
+    # step 5: build LSTM model
+    print("\n" + "="*70)
+    print("STEP 5: BUILDING LSTM MODEL")
+    print("="*70)
+    
+    model = build_lstm_model(vocab_size, tag_size, max_len, embedding_dim=32)
+    model.summary()
+    
+    # step 6: train model
+    print("\n" + "="*70)
+    print("STEP 6: TRAINING LSTM MODEL")
+    print("="*70)
+    
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_test, y_test),
+        epochs=50,
+        batch_size=4,
+        verbose=1
+    )
+    
+    # step 7: evaluate model
+    print("\n" + "="*70)
+    print("STEP 7: MODEL EVALUATION")
+    print("="*70)
+    
+    test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
+    print(f"Test Accuracy: {test_acc:.2%}")
+    print(f"Test Loss: {test_loss:.4f}")
+    
+    # step 8: predict on test sentences
+    print("\n" + "="*70)
+    print("STEP 8: PREDICTIONS ON TEST SENTENCES")
+    print("="*70)
+    
+    test_sentences = [
+        "Ram loves coding",
+        "She works at Microsoft",
+        "The dog ran fast",
+        "Python is awesome"
+    ]
+    
+    for sentence in test_sentences:
+        words, predicted = predict_sequence(model, sentence, word_to_idx, idx_to_tag, max_len)
+        print(f"\nSentence: {sentence}")
+        print(f"Words: {words}")
+        print(f"Predicted tags: {predicted}")
+    
+    # step 9: show training history
+    print("\n" + "="*70)
+    print("STEP 9: TRAINING HISTORY")
+    print("="*70)
+    
+    print(f"Final training accuracy: {history.history['accuracy'][-1]:.2%}")
+    print(f"Final validation accuracy: {history.history['val_accuracy'][-1]:.2%}")
+    
+    # step 10: compare RNN vs LSTM explanation
+    print("\n" + "="*70)
+    print("STEP 10: UNDERSTANDING LSTM ADVANTAGES")
+    print("="*70)
+    
+    print("""
+Why LSTM is better than traditional RNN:
+1. Solves Vanishing Gradient Problem:
+   - RNN struggles with long sequences because gradients become very small
+   - LSTM uses forget gate to remember important information
+
+2. Long-term Dependencies:
+   - RNN forgets earlier words in sentence
+   - LSTM remembers context from earlier in sequence
+
+3. Sequence Labeling Performance:
+   - LSTM captures relationships between words
+   - Bidirectional LSTM sees both past and future context
+    """)
