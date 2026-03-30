@@ -1,0 +1,317 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.preprocessing import LabelEncoder
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import re
+import gensim.downloader as api
+from collections import defaultdict
+import time
+import warnings
+warnings.filterwarnings('ignore')
+
+# downloading nltk data
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+    
+try:
+    nltk.data.find('corpora/stopwords')
+except:
+    nltk.download('stopwords')
+
+def preprocess_text(txt):
+    """clean and preprocess text"""
+    txt = txt.lower()
+    txt = re.sub(r'[^a-zA-Z\s]', '', txt)
+    words = word_tokenize(txt)
+    # remove stopwords
+    stop_words = set(stopwords.words('english'))
+    words = [w for w in words if w not in stop_words]
+    return words
+
+def get_sentence_embedding(words, model, embedding_dim=100):
+    """convert sentence to vector by averaging word embeddings"""
+    word_vectors = []
+    for word in words:
+        if word in model:
+            word_vectors.append(model[word])
+    
+    if len(word_vectors) == 0:
+        return np.zeros(embedding_dim)
+    
+    return np.mean(word_vectors, axis=0)
+
+def load_embeddings():
+    """load pre-trained word2vec model"""
+    print("Loading pre-trained Word2Vec model (this may take a moment)...")
+    # using glove-twitter-25 for faster loading, or you can use word2vec-google-news-300
+    model = api.load('glove-twitter-25')
+    print("Model loaded successfully!")
+    return model
+
+# main execution
+if __name__ == "__main__":
+    
+    # customer support ticket dataset
+    tickets = [
+        # Account Issues
+        ("I forgot my password and cannot login to my account", "account"),
+        ("My account is locked, please help me unlock it", "account"),
+        ("Unable to reset password, verification email not received", "account"),
+        ("Login failed multiple times, account suspended", "account"),
+        ("Need help updating my email address", "account"),
+        ("Two-factor authentication not working", "account"),
+        
+        # Billing Issues
+        ("My payment was deducted but subscription not activated", "billing"),
+        ("Credit card charged twice for same order", "billing"),
+        ("Refund not processed even after 7 days", "billing"),
+        ("Invoice not generated after payment", "billing"),
+        ("Want to cancel subscription but still charged", "billing"),
+        ("Payment method update failed", "billing"),
+        
+        # Technical Issues
+        ("Application crashes when I open the dashboard", "technical"),
+        ("Error 404 when accessing my profile page", "technical"),
+        ("App freezes during video upload", "technical"),
+        ("Loading takes forever, page stuck", "technical"),
+        ("Feature not working after latest update", "technical"),
+        ("Unable to upload files, shows error", "technical"),
+        
+        # Product Inquiry
+        ("What features are included in premium plan", "product"),
+        ("How to upgrade to business account", "product"),
+        ("Is there a mobile app available", "product"),
+        ("Tell me about pricing plans", "product"),
+        ("Do you offer student discount", "product"),
+        ("What is the difference between basic and pro", "product"),
+        
+        # Shipping/Delivery
+        ("Where is my order, tracking not updated", "shipping"),
+        ("Product delivered but damaged", "shipping"),
+        ("Wrong item received in shipment", "shipping"),
+        ("Order delayed beyond expected date", "shipping"),
+        ("Shipping address change request", "shipping"),
+        ("Package marked delivered but not received", "shipping")
+    ]
+    
+    # separate texts and labels
+    texts = [item[0] for item in tickets]
+    labels = [item[1] for item in tickets]
+    
+    print("\n" + "="*70)
+    print("STEP 1: DATASET OVERVIEW")
+    print("="*70)
+    print(f"Total tickets: {len(tickets)}")
+    print(f"Categories: {set(labels)}")
+    print("\nSample tickets:")
+    for i in range(5):
+        print(f"  {i+1}. {texts[i][:60]}... -> {labels[i]}")
+    
+    # step 2: preprocess all tickets
+    print("\n" + "="*70)
+    print("STEP 2: TEXT PREPROCESSING")
+    print("="*70)
+    
+    processed_tickets = [preprocess_text(txt) for txt in texts]
+    print("Sample preprocessing:")
+    print(f"  Original: {texts[0]}")
+    print(f"  Processed: {processed_tickets[0]}")
+    
+    # step 3: load word embeddings
+    print("\n" + "="*70)
+    print("STEP 3: LOADING WORD EMBEDDINGS")
+    print("="*70)
+    
+    word2vec_model = load_embeddings()
+    embedding_dim = word2vec_model.vector_size
+    print(f"Embedding dimension: {embedding_dim}")
+    
+    # step 4: generate sentence embeddings
+    print("\n" + "="*70)
+    print("STEP 4: GENERATING SENTENCE EMBEDDINGS")
+    print("="*70)
+    
+    embeddings = []
+    for words in processed_tickets:
+        vec = get_sentence_embedding(words, word2vec_model, embedding_dim)
+        embeddings.append(vec)
+    
+    X = np.array(embeddings)
+    print(f"Embedding matrix shape: {X.shape}")
+    
+    # encode labels
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(labels)
+    print(f"Label mapping: {dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_)))}")
+    
+    # step 5: train classifier
+    print("\n" + "="*70)
+    print("STEP 5: TRAINING CLASSIFIER")
+    print("="*70)
+    
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    
+    print(f"Training samples: {X_train.shape[0]}")
+    print(f"Testing samples: {X_test.shape[0]}")
+    
+    # try multiple classifiers
+    classifiers = {
+        'SVM (Linear)': SVC(kernel='linear', random_state=42),
+        'SVM (RBF)': SVC(kernel='rbf', random_state=42),
+        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42)
+    }
+    
+    best_model = None
+    best_accuracy = 0
+    
+    for name, clf in classifiers.items():
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+        print(f"\n{name} Accuracy: {acc:.2%}")
+        
+        if acc > best_accuracy:
+            best_accuracy = acc
+            best_model = clf
+            best_name = name
+    
+    print(f"\nBest model: {best_name} with {best_accuracy:.2%} accuracy")
+    
+    # step 6: evaluation on test set
+    print("\n" + "="*70)
+    print("STEP 6: MODEL EVALUATION")
+    print("="*70)
+    
+    y_pred = best_model.predict(X_test)
+    print(f"Overall Accuracy: {best_accuracy:.2%}")
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
+    
+    # step 7: real-time prediction demo
+    print("\n" + "="*70)
+    print("STEP 7: REAL-TIME PREDICTION DEMO")
+    print("="*70)
+    
+    new_queries = [
+        "I can't login, password reset email not coming",
+        "My card was charged twice for the same subscription",
+        "App keeps crashing when I open settings",
+        "What is included in the premium membership",
+        "My order hasn't arrived, it's been 10 days",
+        "Unable to update profile picture, error shows",
+        "Refund request pending for 2 weeks"
+    ]
+    
+    print("\nProcessing new customer queries in real-time:")
+    print("-"*70)
+    
+    for query in new_queries:
+        start_time = time.time()
+        
+        # preprocess
+        processed = preprocess_text(query)
+        # get embedding
+        embedding = get_sentence_embedding(processed, word2vec_model, embedding_dim)
+        # predict
+        pred = best_model.predict([embedding])[0]
+        category = label_encoder.inverse_transform([pred])[0]
+        
+        elapsed_time = (time.time() - start_time) * 1000  # in milliseconds
+        
+        print(f"\nQuery: \"{query}\"")
+        print(f"Predicted Category: {category.upper()}")
+        print(f"Processing Time: {elapsed_time:.2f} ms")
+    
+    # step 8: semantic similarity demonstration
+    print("\n" + "="*70)
+    print("STEP 8: SEMANTIC SIMILARITY DEMONSTRATION")
+    print("="*70)
+    
+    def cosine_similarity(vec1, vec2):
+        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+    
+    # compare word embeddings
+    test_words = ['payment', 'transaction', 'login', 'password', 'crash', 'error']
+    
+    print("\nWord Embeddings (first 5 dimensions):")
+    for word in test_words:
+        if word in word2vec_model:
+            print(f"  {word:<12}: {word2vec_model[word][:5].round(4)}")
+    
+    print("\nCosine Similarity between words:")
+    print("-"*50)
+    
+    word_pairs = [
+        ('payment', 'transaction'),
+        ('login', 'password'),
+        ('crash', 'error'),
+        ('payment', 'refund'),
+        ('account', 'profile'),
+        ('payment', 'shipping')
+    ]
+    
+    for w1, w2 in word_pairs:
+        if w1 in word2vec_model and w2 in word2vec_model:
+            sim = cosine_similarity(word2vec_model[w1], word2vec_model[w2])
+            print(f"  {w1:<12} and {w2:<12}: {sim:.4f}")
+    
+    # step 9: compare with keyword matching
+    print("\n" + "="*70)
+    print("STEP 9: COMPARISON WITH KEYWORD MATCHING")
+    print("="*70)
+    
+    # simple keyword matching approach
+    keyword_rules = {
+        'account': ['password', 'login', 'account', 'locked', 'reset'],
+        'billing': ['payment', 'charged', 'refund', 'invoice', 'subscription'],
+        'technical': ['crash', 'error', 'freeze', 'stuck', 'not working'],
+        'product': ['features', 'plan', 'pricing', 'upgrade', 'discount'],
+        'shipping': ['order', 'delivered', 'shipping', 'tracking', 'damaged']
+    }
+    
+    def keyword_match(query):
+        query_lower = query.lower()
+        scores = {}
+        for category, keywords in keyword_rules.items():
+            score = sum(1 for kw in keywords if kw in query_lower)
+            scores[category] = score
+        return max(scores, key=scores.get) if max(scores.values()) > 0 else 'unknown'
+    
+    print("\nComparing Word Embedding vs Keyword Matching:")
+    print("-"*70)
+    
+    comparison_queries = [
+        ("My transaction failed but money deducted", "billing"),
+        ("Cannot access my profile, says error", "technical"),
+        ("Tell me about premium features", "product"),
+        ("Package not delivered yet", "shipping")
+    ]
+    
+    for query, expected in comparison_queries:
+        # word embedding prediction
+        processed = preprocess_text(query)
+        embedding = get_sentence_embedding(processed, word2vec_model, embedding_dim)
+        emb_pred = label_encoder.inverse_transform([best_model.predict([embedding])[0]])[0]
+        
+        # keyword matching
+        kw_pred = keyword_match(query)
+        
+        print(f"\nQuery: \"{query}\"")
+        print(f"Expected: {expected}")
+        print(f"Word Embedding Prediction: {emb_pred} {'✓' if emb_pred == expected else '✗'}")
+        print(f"Keyword Matching Prediction: {kw_pred} {'✓' if kw_pred == expected else '✗'}")
