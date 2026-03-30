@@ -1,0 +1,237 @@
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import SVC, LinearSVC
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import re
+import numpy as np
+
+# downloading nltk data
+try:
+    nltk.data.find('tokenizers/punkt')
+except:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except:
+    nltk.download('punkt_tab')
+    
+try:
+    nltk.data.find('corpora/stopwords')
+except:
+    nltk.download('stopwords')
+
+def preprocess_text(txt):
+    """basic text preprocessing"""
+    txt = txt.lower()
+    txt = re.sub(r'[^a-zA-Z\s]', '', txt)
+    words = word_tokenize(txt)
+    # remove stopwords
+    stop_words = set(stopwords.words('english'))
+    words = [w for w in words if w not in stop_words]
+    return ' '.join(words)
+
+def evaluate_model(model, X_test, y_test, model_name):
+    """evaluate model performance"""
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"\n{model_name} Results:")
+    print("-"*50)
+    print(f"Accuracy: {accuracy:.2%}")
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    return accuracy, y_pred
+
+def predict_new_text(text, vectorizer, model):
+    """predict class for new text"""
+    processed = preprocess_text(text)
+    transformed = vectorizer.transform([processed])
+    prediction = model.predict(transformed)[0]
+    proba = model.predict_proba(transformed)[0] if hasattr(model, 'predict_proba') else None
+    
+    return prediction, proba
+
+# main execution
+if __name__ == "__main__":
+    
+    # dataset for sentiment classification
+    data = [
+        # positive reviews
+        ("I love this movie, it was amazing and fantastic!", "positive"),
+        ("Great film, wonderful acting and beautiful story", "positive"),
+        ("Excellent movie, highly recommended to everyone", "positive"),
+        ("Best movie ever seen, loved every moment", "positive"),
+        ("Fantastic performance by the actors", "positive"),
+        ("Awesome movie, will watch again", "positive"),
+        ("Superb cinematography and direction", "positive"),
+        ("Loved it, very entertaining", "positive"),
+        
+        # negative reviews
+        ("Worst movie ever, waste of time", "negative"),
+        ("Terrible acting and boring story", "negative"),
+        ("Disappointing film, not worth watching", "negative"),
+        ("Bad movie, poor direction and script", "negative"),
+        ("Horrible experience, regret watching", "negative"),
+        ("Awful acting, couldn't finish it", "negative"),
+        ("Very boring and slow, not good", "negative"),
+        ("Complete waste of money, terrible", "negative"),
+        
+        # neutral or mixed
+        ("It was okay, nothing special", "neutral"),
+        ("Average movie, some good parts", "neutral"),
+        ("Not great but not bad either", "neutral"),
+        ("Decent film, could be better", "neutral")
+    ]
+    
+    # separate texts and labels
+    texts = [item[0] for item in data]
+    labels = [item[1] for item in data]
+    
+    print("\n" + "="*70)
+    print("STEP 1: DATASET OVERVIEW")
+    print("="*70)
+    print(f"Total samples: {len(texts)}")
+    print(f"Classes: {set(labels)}")
+    print("\nSample data:")
+    for i in range(5):
+        print(f"  '{texts[i][:50]}...' -> {labels[i]}")
+    
+    # step 2: preprocessing
+    print("\n" + "="*70)
+    print("STEP 2: TEXT PREPROCESSING")
+    print("="*70)
+    
+    processed_texts = [preprocess_text(txt) for txt in texts]
+    print("Sample before preprocessing:")
+    print(f"  {texts[0]}")
+    print("Sample after preprocessing:")
+    print(f"  {processed_texts[0]}")
+    
+    # step 3: feature extraction
+    print("\n" + "="*70)
+    print("STEP 3: FEATURE EXTRACTION (TF-IDF)")
+    print("="*70)
+    
+    vectorizer = TfidfVectorizer(max_features=100, ngram_range=(1,2))
+    X = vectorizer.fit_transform(processed_texts)
+    print(f"Feature matrix shape: {X.shape}")
+    print(f"Features extracted: {len(vectorizer.get_feature_names_out())}")
+    print("Top features:")
+    features = vectorizer.get_feature_names_out()[:15]
+    print(f"  {list(features)}")
+    
+    # step 4: split data
+    print("\n" + "="*70)
+    print("STEP 4: TRAIN-TEST SPLIT")
+    print("="*70)
+    
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, labels, test_size=0.25, random_state=42, stratify=labels
+    )
+    print(f"Training samples: {X_train.shape[0]}")
+    print(f"Testing samples: {X_test.shape[0]}")
+    
+    # step 5: train Naive Bayes
+    print("\n" + "="*70)
+    print("STEP 5: TRAINING NAIVE BAYES CLASSIFIER")
+    print("="*70)
+    
+    nb_model = MultinomialNB()
+    nb_model.fit(X_train, y_train)
+    nb_accuracy, nb_pred = evaluate_model(nb_model, X_test, y_test, "Naive Bayes")
+    
+    # step 6: train SVM
+    print("\n" + "="*70)
+    print("STEP 6: TRAINING SVM CLASSIFIER")
+    print("="*70)
+    
+    svm_model = LinearSVC(random_state=42, max_iter=1000)
+    svm_model.fit(X_train, y_train)
+    svm_pred = svm_model.predict(X_test)
+    svm_accuracy = accuracy_score(y_test, svm_pred)
+    
+    print(f"\nSVM Results:")
+    print("-"*50)
+    print(f"Accuracy: {svm_accuracy:.2%}")
+    print("\nClassification Report:")
+    print(classification_report(y_test, svm_pred))
+    
+    # step 7: compare both models
+    print("\n" + "="*70)
+    print("STEP 7: MODEL COMPARISON")
+    print("="*70)
+    
+    print(f"Naive Bayes Accuracy: {nb_accuracy:.2%}")
+    print(f"SVM Accuracy: {svm_accuracy:.2%}")
+    
+    if nb_accuracy > svm_accuracy:
+        print("Naive Bayes performed better for this dataset")
+        best_model = nb_model
+    elif svm_accuracy > nb_accuracy:
+        print("SVM performed better for this dataset")
+        best_model = svm_model
+    else:
+        print("Both models performed equally")
+        best_model = nb_model
+    
+    # step 8: test on new samples
+    print("\n" + "="*70)
+    print("STEP 8: TESTING ON NEW TEXT SAMPLES")
+    print("="*70)
+    
+    test_samples = [
+        "This movie was absolutely fantastic, loved every second!",
+        "What a waste of time, terrible movie",
+        "It was okay, nothing special about it",
+        "Amazing acting and great storyline",
+        "Boring and slow, didn't like it at all"
+    ]
+    
+    print("\nPredictions using SVM (best model):")
+    print("-"*60)
+    for sample in test_samples:
+        processed = preprocess_text(sample)
+        transformed = vectorizer.transform([processed])
+        pred = svm_model.predict(transformed)[0]
+        print(f"\nText: '{sample}'")
+        print(f"Predicted sentiment: {pred.upper()}")
+    
+    # step 9: confusion matrix analysis
+    print("\n" + "="*70)
+    print("STEP 9: CONFUSION MATRIX ANALYSIS")
+    print("="*70)
+    
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(y_test, svm_pred, labels=['positive', 'neutral', 'negative'])
+    print("Confusion Matrix (SVM):")
+    print("Rows: Actual, Columns: Predicted")
+    print(f"{'':<12} {'Positive':<10} {'Neutral':<10} {'Negative':<10}")
+    print("-"*45)
+    classes = ['positive', 'neutral', 'negative']
+    for i, actual in enumerate(classes):
+        row = f"{actual:<12}"
+        for j in range(3):
+            row += f"{cm[i][j]:<10}"
+        print(row)
+    
+    # step 10: feature importance (for Naive Bayes)
+    print("\n" + "="*70)
+    print("STEP 10: FEATURE IMPORTANCE ANALYSIS")
+    print("="*70)
+    
+    # get top features for each class (Naive Bayes)
+    feature_names = vectorizer.get_feature_names_out()
+    nb_feature_log_probs = nb_model.feature_log_prob_
+    
+    print("\nTop words for each sentiment (Naive Bayes):")
+    for i, class_name in enumerate(nb_model.classes_):
+        top_indices = np.argsort(nb_feature_log_probs[i])[-10:]
+        top_features = [feature_names[idx] for idx in top_indices]
+        print(f"\n{class_name.upper()}:")
+        print(f"  {', '.join(top_features)}")
