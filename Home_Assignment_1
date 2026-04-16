@@ -1,0 +1,42 @@
+import nltk
+import re
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Loading essential linguistic databases
+print("--- Initializing NLTK Resources ---")
+nltk.download('punkt')      # Tokenizer
+nltk.download('stopwords')  # Common stopword list
+nltk.download('wordnet')    # Dictionary for Lemmatization
+
+def advanced_preprocess(text):
+    print(f"\n[1] Input Text: {text}")
+    
+    # Step 1: Case Folding
+    lower_text = text.lower()
+    print(f"[2] Lowercase: {lower_text}")
+    
+    # Step 2: Noise Removal (Keep only letters)
+    clean_text = re.sub(r'[^a-zA-Z\s]', '', lower_text)
+    print(f"[3] Noise Removed: {clean_text}")
+    
+    # Step 3: Tokenization
+    tokens = word_tokenize(clean_text)
+    print(f"[4] Tokens Created: {tokens}")
+    
+    # Step 4: Stopword Removal
+    stop_words = set(stopwords.words('english'))
+    filtered = [w for w in tokens if w not in stop_words]
+    print(f"[5] Stopwords Removed: {filtered}")
+    
+    # Step 5: Lemmatization
+    lemmatizer = WordNetLemmatizer()
+    lemmas = [lemmatizer.lemmatize(w) for w in filtered]
+    print(f"[6] Final Lemmatized Output: {lemmas}")
+    
+    return lemmas
+
+# Execution with a complex example
+sample = "The students were studying hard for their NLP exams; they're learning amazing techniques!"
+final_output = advanced_preprocess(sample)
