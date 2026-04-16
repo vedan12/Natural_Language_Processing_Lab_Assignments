@@ -1,0 +1,58 @@
+import nltk
+from nltk import pos_tag, word_tokenize, RegexpParser
+
+# Downloading required NLTK resources for tokenization and tagging
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('punkt_tab')
+
+def main():
+    # Input Paragraph from your problem statement
+    paragraph = "Natural language processing techniques are widely used in artificial intelligence applications. The intelligent system extracts meaningful information from large datasets."
+
+    print("="*80)
+    print("STEP 1: PREPROCESSING (TOKENIZATION)")
+    print("="*80)
+    # Step 2: Divide paragraph into sentences
+    sentences = nltk.sent_tokenize(paragraph)
+    print(f"Total sentences found: {len(sentences)}")
+
+    # Step 6: Define noun phrase grammar pattern
+    # Grammar Rule: Optional Determiner (DT), Zero or more Adjectives (JJ), One or more Nouns (NN.*)
+    grammar = "NP: {<DT>?<JJ>*<NN.*>+}"
+    cp = RegexpParser(grammar)
+
+    print("\n" + "="*80)
+    print("STEP 2: POS TAGGING & CHUNKING (SENTENCE BY SENTENCE)")
+    print("="*80)
+    
+    all_noun_phrases = []
+    
+    for i, sent in enumerate(sentences, 1):
+        # Step 4: Split sentence into words (Tokenization)
+        words = word_tokenize(sent)
+        # Step 5: Assign Part-of-Speech tags
+        tagged = pos_tag(words)
+        # Step 7: Apply chunk parsing using the grammar rule
+        tree = cp.parse(tagged)
+        
+        # Step 8 & 9: Identify NP subtrees and extract words
+        sentence_nps = []
+        for subtree in tree.subtrees(filter=lambda t: t.label() == 'NP'):
+            phrase = " ".join([word for word, tag in subtree.leaves()])
+            sentence_nps.append(phrase)
+            all_noun_phrases.append(phrase)
+            
+        print(f"\nSentence {i}: {sent}")
+        print(f"POS Tags (first 6): {tagged[:6]}...")
+        print(f"Noun Phrases Found: {sentence_nps}")
+
+    print("\n" + "="*80)
+    print("FINAL EXTRACTED NOUN PHRASES FOR ASSIGNMENT DOCUMENTATION")
+    print("="*80)
+    for idx, np in enumerate(all_noun_phrases, 1):
+        print(f"{idx}. {np}")
+    print("="*80)
+
+if __name__ == "__main__":
+    main()
