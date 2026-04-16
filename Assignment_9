@@ -1,0 +1,84 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, SimpleRNN, Dense
+
+# --- STEP 1: PREPROCESS TEXT & DATASET ---
+# Sample corpus for the model to learn from
+data = """Natural Language Processing is a field of artificial intelligence.
+RNN is used for sequence modeling in NLP.
+Language models predict the next word in a sentence.
+Deep learning models like RNN and LSTM are great for text generation.
+Pimpri Chinchwad College of Engineering provides quality education."""
+
+# Tokenization
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts([data])
+total_words = len(tokenizer.word_index) + 1
+
+# --- STEP 2: CREATE SEQUENCES ---
+input_sequences = []
+for line in data.split('\n'):
+    token_list = tokenizer.texts_to_sequences([line])[0]
+    for i in range(1, len(token_list)):
+        n_gram_sequence = token_list[:i+1]
+        input_sequences.append(n_gram_sequence)
+
+# Pad sequences
+max_sequence_len = max([len(x) for x in input_sequences])
+input_sequences = np.array(pad_sequences(input_sequences, maxlen=max_sequence_len, padding='pre'))
+
+# Create predictors and label
+X, y = input_sequences[:,:-1], input_sequences[:,-1]
+y = tf.keras.utils.to_categorical(y, num_classes=total_words)
+
+# --- STEP 3: BUILD RNN MODEL ---
+model = Sequential([
+    Embedding(total_words, 10, input_length=max_sequence_len-1),
+    SimpleRNN(100),
+    Dense(total_words, activation='softmax')
+])
+
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+# --- STEP 4: TRAIN MODEL (With Visible Logs) ---
+print("\n" + "="*70)
+print(f"TRAINING RNN MODEL - {time.strftime('%Y-%m-%d %H:%M:%S')}")
+print("="*70)
+
+# Set verbose=1 to show the progress bar and metrics for screenshots
+history = model.fit(X, y, epochs=100, verbose=1) 
+
+# --- STEP 5: RESULTS & TEXT GENERATION DEMO ---
+print("\n" + "="*70)
+print("FINAL GENERATION RESULTS")
+print("="*70)
+
+test_seeds = [
+    "Natural Language",
+    "Deep learning",
+    "Pimpri Chinchwad"
+]
+
+for seed in test_seeds:
+    generated = generate_text(seed, 6, model, max_sequence_len)
+    print(f"\n[SEED]: {seed}")
+    print(f"[GENERATED]: {generated}")
+
+print("\n" + "="*70)
+print("MODEL SUMMARY FOR ASSIGNMENT RECORD")
+print("="*70)
+model.summary()
+
+# --- RESULTS ---
+seed = "Natural Language"
+generated = generate_text(seed, 5, model, max_sequence_len)
+
+print("="*50)
+print("RESULTS")
+print("="*50)
+print(f"Seed Input: {seed}")
+print(f"Generated Output: {generated}")
+print("="*50)
