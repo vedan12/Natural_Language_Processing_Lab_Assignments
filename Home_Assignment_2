@@ -1,0 +1,37 @@
+import gensim.downloader as api
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# Load pre-trained models
+print("Loading Embedding Models (this may take a minute)...")
+word2vec = api.load("word2vec-google-news-300")
+glove = api.load("glove-wiki-gigaword-100")
+fasttext = api.load("fasttext-wiki-news-subwords-300")
+
+def compare_embeddings(word1, word2):
+    print(f"\nComparing Similarity between '{word1}' and '{word2}':")
+    print("-" * 45)
+    
+    # Word2Vec Similarity
+    w2v_sim = word2vec.similarity(word1, word2)
+    print(f"Word2Vec Similarity : {w2v_sim:.4f}")
+    
+    # GloVe Similarity
+    glove_sim = glove.similarity(word1, word2)
+    print(f"GloVe Similarity    : {glove_sim:.4f}")
+    
+    # FastText Similarity
+    ft_sim = fasttext.similarity(word1, word2)
+    print(f"FastText Similarity : {ft_sim:.4f}")
+
+# Example 1: Semantic similarity
+compare_embeddings("king", "queen")
+
+# Example 2: Syntactic/OOV test (FastText excels here)
+print("\n--- OOV / Subword Test (FastText vs Others) ---")
+try:
+    word = "micro-learning"
+    print(f"FastText vector for '{word}': {fasttext[word][:5]}... (Success)")
+    print(f"Word2Vec vector for '{word}': {word2vec[word]}")
+except KeyError:
+    print(f"Word2Vec Error: '{word}' not in vocabulary.")
