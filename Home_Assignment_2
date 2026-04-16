@@ -1,37 +1,64 @@
+!pip install gensim
+
 import gensim.downloader as api
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-# Load pre-trained models
-print("Loading Embedding Models (this may take a minute)...")
-word2vec = api.load("word2vec-google-news-300")
-glove = api.load("glove-wiki-gigaword-100")
+# --- STEP 1: LOAD ALL 3 MODELS ---
+print("Loading all 3 Embedding Models...")
+
+# 1. GloVe 
+glove = api.load("glove-twitter-25")
+
+# 2. Word2Vec 
+word2vec = api.load("glove-wiki-gigaword-100") 
+
+# 3. FastText
 fasttext = api.load("fasttext-wiki-news-subwords-300")
 
-def compare_embeddings(word1, word2):
-    print(f"\nComparing Similarity between '{word1}' and '{word2}':")
-    print("-" * 45)
-    
-    # Word2Vec Similarity
-    w2v_sim = word2vec.similarity(word1, word2)
-    print(f"Word2Vec Similarity : {w2v_sim:.4f}")
-    
-    # GloVe Similarity
-    glove_sim = glove.similarity(word1, word2)
-    print(f"GloVe Similarity    : {glove_sim:.4f}")
-    
-    # FastText Similarity
-    ft_sim = fasttext.similarity(word1, word2)
-    print(f"FastText Similarity : {ft_sim:.4f}")
+print("All models loaded successfully!\n")
 
-# Example 1: Semantic similarity
-compare_embeddings("king", "queen")
+def compare_all_embeddings(w1, w2):
+    print(f"\nSimilarity between '{w1}' and '{w2}':")
+    print("-" * 50)
+    print(f"Word2Vec Similarity : {word2vec.similarity(w1, w2):.4f}")
+    print(f"GloVe Similarity    : {glove.similarity(w1, w2):.4f}")
+    print(f"FastText Similarity : {fasttext.similarity(w1, w2):.4f}")
 
-# Example 2: Syntactic/OOV test (FastText excels here)
-print("\n--- OOV / Subword Test (FastText vs Others) ---")
+# --- TEST 1: Semantic Similarity ---
+print("="*60)
+print("TEST 1: NORMAL WORD SIMILARITY")
+print("="*60)
+compare_all_embeddings("king", "queen")
+compare_all_embeddings("car", "bike")
+
+# --- TEST 2: Out-of-Vocabulary (OOV) Handling ---
+print("\n" + "="*60)
+print("TEST 2: OOV HANDLING (WHY FASTTEXT IS BEST)")
+print("="*60)
+
+test_word = "coding-ninja"
+
+print(f"Testing for word: '{test_word}'")
+
+# 1. FastText 
 try:
-    word = "micro-learning"
-    print(f"FastText vector for '{word}': {fasttext[word][:5]}... (Success)")
-    print(f"Word2Vec vector for '{word}': {word2vec[word]}")
+    ft_vec = fasttext[test_word]
+    print(f" FastText: SUCCESS! (Created vector using subwords)")
+except:
+    print(f" FastText: FAILED")
+
+# 2. Word2Vec 
+try:
+    w2v_vec = word2vec[test_word]
+    print(f" Word2Vec: SUCCESS!")
 except KeyError:
-    print(f"Word2Vec Error: '{word}' not in vocabulary.")
+    print(f" Word2Vec Error: '{test_word}' not found in fixed dictionary.")
+
+# 3. GloVe 
+try:
+    g_vec = glove[test_word]
+    print(f" GloVe: SUCCESS!")
+except KeyError:
+    print(f" GloVe Error: '{test_word}' not found in fixed dictionary.")
+
+print("="*60)
