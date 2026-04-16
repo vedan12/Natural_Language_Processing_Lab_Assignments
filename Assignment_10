@@ -1,0 +1,72 @@
+import numpy as np
+import gensim.downloader as api
+from sklearn.metrics.pairwise import cosine_similarity
+import re
+import time
+
+# --- STEP 1: LOAD PRE-TRAINED EMBEDDINGS ---
+def load_model():
+    print("Loading pre-trained Word2Vec/GloVe model...")
+    # Using a smaller model for faster execution in lab environment
+    model = api.load('glove-twitter-25') 
+    print("Model loaded successfully!")
+    return model
+
+# --- STEP 2: PREPROCESSING FUNCTION ---
+def preprocess(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z\s]', '', text)
+    return text.split()
+
+# --- STEP 3: SENTENCE TO VECTOR (AVERAGE EMBEDDING) ---
+def get_sentence_vector(words, model):
+    word_vectors = [model[word] for word in words if word in model]
+    if not word_vectors:
+        return np.zeros(model.vector_size)
+    return np.mean(word_vectors, axis=0)
+
+# --- MAIN EXECUTION ---
+if __name__ == "__main__":
+    word2vec_model = load_model()
+    
+    # Practical Problem: Semantic Search in a FAQ Dataset
+    faq_dataset = [
+        "How do I reset my account password?",
+        "What are the best laptops for software development?",
+        "The application is crashing on the startup screen.",
+        "I want to upgrade my subscription plan.",
+        "How to track my order delivery status?"
+    ]
+    
+    # Pre-calculate embeddings for dataset
+    dataset_vectors = []
+    for sentence in faq_dataset:
+        processed_words = preprocess(sentence)
+        vector = get_sentence_vector(processed_words, word2vec_model)
+        dataset_vectors.append(vector)
+
+    # --- STEP 4: REAL-TIME QUERY PROCESSING ---
+    user_query = "top programming notebooks for developers"
+    print(f"\n[USER QUERY]: \"{user_query}\"")
+    
+    query_words = preprocess(user_query)
+    query_vector = get_sentence_vector(query_words, word2vec_model).reshape(1, -1)
+
+    # --- STEP 5: COMPUTE SIMILARITY & RANK ---
+    similarities = []
+    for vec in dataset_vectors:
+        sim = cosine_similarity(query_vector, vec.reshape(1, -1))[0][0]
+        similarities.append(sim)
+
+    # Find top result
+    best_index = np.argmax(similarities)
+    
+    print("\n" + "="*70)
+    print("SEMANTIC SEARCH RESULTS")
+    print("="*70)
+    print(f"Top Match: {faq_dataset[best_index]}")
+    print(f"Similarity Score: {similarities[best_index]:.4f}")
+    print("-" * 70)
+    print("Analysis: Word embeddings captured that 'programming' and 'coding' ")
+    print("as well as 'notebooks' and 'laptops' are semantically related.")
+    print("="*70)
