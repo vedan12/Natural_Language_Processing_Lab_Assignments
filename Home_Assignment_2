@@ -1,72 +1,62 @@
+import gensim.downloader as api
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.layers import Embedding, Dense, Reshape, Dot, Input
-from tensorflow.keras.models import Model
 
-# --- STEP 1: PREPARE DATASET ---
-corpus = [
-    "pimpri chinchwad college of engineering",
-    "information technology is a great branch",
-    "natural language processing is interesting",
-    "deep learning and neural networks are powerful",
-    "nlp lab assignments are based on python"
-]
+# --- STEP 1: LOAD ALL 3 MODELS ---
+print("Loading all 3 Embedding Models...")
 
-# --- STEP 2: TOKENIZATION & VOCABULARY ---
-tokenizer = Tokenizer()
-tokenizer.fit_on_texts(corpus)
-word2idx = tokenizer.word_index
-vocab_size = len(word2idx) + 1
+# 1. GloVe 
+glove = api.load("glove-twitter-25")
 
-# --- STEP 3: GENERATE TRAINING PAIRS (Skip-grams) ---
-# Creates (Target, Context) word pairs with labels (1 for real, 0 for random)
-couples, labels = tf.keras.preprocessing.sequence.skipgrams(
-    tokenizer.texts_to_sequences(corpus), 
-    vocabulary_size=vocab_size, 
-    window_size=2
-)
+# 2. Word2Vec 
+word2vec = api.load("glove-wiki-gigaword-100") 
 
-word_target, word_context = zip(*couples)
-word_target = np.array(word_target, dtype="int32")
-word_context = np.array(word_context, dtype="int32")
-labels = np.array(labels, dtype="int32")
+# 3. FastText
+fasttext = api.load("fasttext-wiki-news-subwords-300")
 
-# --- STEP 4: DEFINE NEURAL NETWORK ARCHITECTURE ---
-embed_size = 50  # Dimension of the word vector
+print("All models loaded successfully!\n")
 
-# Input Layers
-target_inp = Input((1,))
-context_inp = Input((1,))
+def compare_all_embeddings(w1, w2):
+    print(f"\nSimilarity between '{w1}' and '{w2}':")
+    print("-" * 50)
+    print(f"Word2Vec Similarity : {word2vec.similarity(w1, w2):.4f}")
+    print(f"GloVe Similarity    : {glove.similarity(w1, w2):.4f}")
+    print(f"FastText Similarity : {fasttext.similarity(w1, w2):.4f}")
 
-# Shared Embedding Layer
-embedding = Embedding(vocab_size, embed_size, input_length=1, name="word_embedding")
-
-# Vector Lookups
-target_vec = Reshape((embed_size,))(embedding(target_inp))
-context_vec = Reshape((embed_size,))(embedding(context_inp))
-
-# Dot Product Similarity
-dot_product = Dot(axes=1)([target_vec, context_vec])
-output = Dense(1, activation='sigmoid')(dot_product)
-
-# Model Assembly
-model = Model(inputs=[target_inp, context_inp], outputs=output)
-model.compile(loss='binary_crossentropy', optimizer='adam')
-
-# --- STEP 5: TRAINING ---
-print("Training Word2Vec model from scratch...")
-model.fit([word_target, word_context], labels, epochs=100, verbose=0)
-print("Training Complete.\n")
-
-# --- STEP 6: EXTRACT LEARNED VECTORS ---
-weights = model.get_layer('word_embedding').get_weights()[0]
-
+# --- TEST 1: Semantic Similarity ---
 print("="*60)
-print("RESULTS: LEARNED WORD VECTORS")
+print("TEST 1: NORMAL WORD SIMILARITY")
 print("="*60)
-test_words = ["pimpri", "nlp", "engineering"]
-for word in test_words:
-    idx = word2idx[word]
-    print(f"Word: {word:<12} | Vector (First 5 dims): {weights[idx][:5].round(4)}")
+compare_all_embeddings("king", "queen")
+compare_all_embeddings("car", "bike")
+
+# --- TEST 2: Out-of-Vocabulary (OOV) Handling ---
+print("\n" + "="*60)
+print("TEST 2: OOV HANDLING (WHY FASTTEXT IS BEST)")
+print("="*60)
+
+test_word = "coding-ninja"
+
+print(f"Testing for word: '{test_word}'")
+
+# 1. FastText 
+try:
+    ft_vec = fasttext[test_word]
+    print(f" FastText: SUCCESS! (Created vector using subwords)")
+except:
+    print(f" FastText: FAILED")
+
+# 2. Word2Vec 
+try:
+    w2v_vec = word2vec[test_word]
+    print(f" Word2Vec: SUCCESS!")
+except KeyError:
+    print(f" Word2Vec Error: '{test_word}' not found in fixed dictionary.")
+
+# 3. GloVe 
+try:
+    g_vec = glove[test_word]
+    print(f" GloVe: SUCCESS!")
+except KeyError:
+    print(f" GloVe Error: '{test_word}' not found in fixed dictionary.")
+
 print("="*60)
