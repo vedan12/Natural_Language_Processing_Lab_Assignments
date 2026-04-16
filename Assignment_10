@@ -7,7 +7,7 @@ import time
 # --- STEP 1: LOAD PRE-TRAINED EMBEDDINGS ---
 def load_model():
     print("Loading pre-trained Word2Vec/GloVe model...")
-    # Using a smaller model for faster execution in lab environment
+    # Using 'glove-twitter-25' for faster execution in lab environment
     model = api.load('glove-twitter-25') 
     print("Model loaded successfully!")
     return model
@@ -27,9 +27,10 @@ def get_sentence_vector(words, model):
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
+    # Load model once
     word2vec_model = load_model()
     
-    # Practical Problem: Semantic Search in a FAQ Dataset
+    # Dataset of sentences (FAQ)
     faq_dataset = [
         "How do I reset my account password?",
         "What are the best laptops for software development?",
@@ -38,35 +39,53 @@ if __name__ == "__main__":
         "How to track my order delivery status?"
     ]
     
-    # Pre-calculate embeddings for dataset
+    print("\n" + "="*80)
+    print("STEP 1: DATASET INDEXING (Generating Sentence Embeddings)")
+    print("="*80)
     dataset_vectors = []
-    for sentence in faq_dataset:
-        processed_words = preprocess(sentence)
-        vector = get_sentence_vector(processed_words, word2vec_model)
+    for i, sentence in enumerate(faq_dataset):
+        processed = preprocess(sentence)
+        vector = get_sentence_vector(processed, word2vec_model)
         dataset_vectors.append(vector)
+        print(f"Index {i}: {sentence[:50]}... -> Vector Size: {vector.shape}")
 
-    # --- STEP 4: REAL-TIME QUERY PROCESSING ---
-    user_query = "top programming notebooks for developers"
-    print(f"\n[USER QUERY]: \"{user_query}\"")
+    # --- STEP 2: REAL-TIME SEMANTIC SEARCH EVALUATION ---
+    queries = [
+        "forgot login credentials",      # Semantic match to password
+        "coding computers",              # Semantic match to laptops
+        "software is hanging",           # Semantic match to crashing
+    ]
+
+    print("\n" + "="*80)
+    print("STEP 2: REAL-TIME SEMANTIC SEARCH EVALUATION")
+    print("="*80)
+    print(f"{'User Query':<30} | {'Top Semantic Match':<40} | {'Score'}")
+    print("-" * 80)
+
+    for q_text in queries:
+        q_processed = preprocess(q_text)
+        q_vector = get_sentence_vector(q_processed, word2vec_model).reshape(1, -1)
+        
+        # Calculate similarity against all dataset vectors
+        sims = [cosine_similarity(q_vector, v.reshape(1, -1))[0][0] for v in dataset_vectors]
+        best_idx = np.argmax(sims)
+        
+        print(f"{q_text:<30} | {faq_dataset[best_idx][0:38]:<40} | {sims[best_idx]:.4f}")
+
+    # --- STEP 3: WORD VECTOR SIMILARITY ANALYSIS ---
+    print("\n" + "="*80)
+    print("STEP 3: WORD VECTOR SIMILARITY ANALYSIS (PROVING THEORY)")
+    print("="*80)
+    word_pairs = [('laptop', 'computer'), ('password', 'login'), ('crash', 'freeze')]
+    for w1, w2 in word_pairs:
+        if w1 in word2vec_model and w2 in word2vec_model:
+            sim = word2vec_model.similarity(w1, w2)
+            print(f"Similarity between '{w1}' and '{w2}': {sim:.4f}")
     
-    query_words = preprocess(user_query)
-    query_vector = get_sentence_vector(query_words, word2vec_model).reshape(1, -1)
-
-    # --- STEP 5: COMPUTE SIMILARITY & RANK ---
-    similarities = []
-    for vec in dataset_vectors:
-        sim = cosine_similarity(query_vector, vec.reshape(1, -1))[0][0]
-        similarities.append(sim)
-
-    # Find top result
-    best_index = np.argmax(similarities)
-    
-    print("\n" + "="*70)
-    print("SEMANTIC SEARCH RESULTS")
-    print("="*70)
-    print(f"Top Match: {faq_dataset[best_index]}")
-    print(f"Similarity Score: {similarities[best_index]:.4f}")
-    print("-" * 70)
-    print("Analysis: Word embeddings captured that 'programming' and 'coding' ")
-    print("as well as 'notebooks' and 'laptops' are semantically related.")
-    print("="*70)
+    print("\n" + "="*80)
+    print("ANALYSIS SUMMARY")
+    print("="*80)
+    print("The results demonstrate that word embeddings capture contextual meaning.")
+    print("Synonyms (like 'computer' and 'laptop') show high similarity scores,")
+    print("allowing the search system to work without exact keyword matching.")
+    print("="*80)
